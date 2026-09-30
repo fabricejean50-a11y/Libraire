@@ -24,15 +24,10 @@ sources = files(
     'src/comic_list.vala'
 )
 
-# Génération des fichiers C à partir de Vala
-c_sources = valac.compile(sources,
-    dependencies: [gtk_dep, adwaita_dep, glib_dep, gobject_dep, gio_dep],
-    args: vala_args
-)
-
 # Exécutable
 executable('comic-library',
-    c_sources,
+    sources,
     dependencies: [gtk_dep, adwaita_dep, glib_dep, gobject_dep, gio_dep],
+    vala_args: vala_args,
     install: true
 )
