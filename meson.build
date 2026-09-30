@@ -25,11 +25,9 @@ sources = files(
 )
 
 # Génération des fichiers C à partir de Vala
-vala_dep = dependency('vala')
 c_sources = valac.compile(sources,
-    dependencies: [gtk_dep, adwaita_dep, glib_dep, gobject_dep, gio_dep, vala_dep],
-    args: vala_args,
-    vala_args: vala_args
+    dependencies: [gtk_dep, adwaita_dep, glib_dep, gobject_dep, gio_dep],
+    args: vala_args
 )
 
 # Exécutable
