@@ -9,14 +9,24 @@ glib_dep = dependency('glib-2.0')
 gobject_dep = dependency('gobject-2.0')
 gio_dep = dependency('gio-2.0')
 
+# Chemins des VAPI pour Vala
+vala_vapi_dirs = [
+    '/usr/share/vala/vapi',
+    '/usr/lib/vala/vapi',
+    '/usr/lib/x86_64-linux-gnu/vala/vapi'
+]
+
 # Configuration pour Vala
 vala_args = [
-    '--vapidir', meson.current_source_dir(),
-    '--target-glib', '2.72',
-    '--pkg', 'gio-2.0',
-    '--pkg', 'gtk4',
-    '--pkg', 'libadwaita-1'
+    '--target-glib', '2.72'
 ]
+
+# Ajouter les chemins VAPI si ils existent
+foreach vapi_dir : vala_vapi_dirs
+    if os.path.exists(vapi_dir)
+        vala_args += ['--vapidir', vapi_dir]
+    endif
+endforeach
 
 # Sources Vala
 sources = files(
