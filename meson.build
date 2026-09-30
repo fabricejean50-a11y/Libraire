@@ -12,7 +12,10 @@ gio_dep = dependency('gio-2.0')
 # Configuration pour Vala
 vala_args = [
     '--vapidir', meson.current_source_dir(),
-    '--target-glib', '2.72'
+    '--target-glib', '2.72',
+    '--pkg', 'gio-2.0',
+    '--pkg', 'gtk4',
+    '--pkg', 'libadwaita-1'
 ]
 
 # Sources Vala
