@@ -19,6 +19,7 @@ include_directories(
     ${GLIB_INCLUDE_DIRS}
     ${GIO_INCLUDE_DIRS}
     ${GOBJECT_INCLUDE_DIRS}
+    src  # Add src directory for relative includes
 )
 
 # Link directories
