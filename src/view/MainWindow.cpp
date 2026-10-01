@@ -67,26 +67,19 @@ void MainWindow::handleSelectionChanged(GtkListView* view) {
     
     if (firstSelected == GTK_INVALID_LIST_POSITION) return;
     
-    // Get the path from the tree list model directly
-    GtkTreeListModel* treeModel = GTK_TREE_LIST_MODEL(listModel);
-    GtkTreeListRow* row = gtk_tree_list_model_get_row(treeModel, firstSelected);
-    if (row == nullptr) return;
+    // Get the item from the model
+    gpointer item = g_list_model_get_item(listModel, firstSelected);
     
-    // Get the path value using the tree list model
-    GValue pathValue = G_VALUE_INIT;
-    g_value_init(&pathValue, G_TYPE_STRING);
+    if (item == nullptr) return;
     
-    // Use gtk_tree_list_model_get_value to get the value at the row's position
-    if (gtk_tree_list_model_get_value(treeModel, row, 1, &pathValue)) {
-        if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
-            const gchar* path = g_value_get_string(&pathValue);
-            if (path) {
-                comicList->loadComicsFromDirectory(path);
-            }
-        }
+    // The item is a GtkTreeListRow, get the path data we stored
+    const gchar* path = static_cast<const gchar*>(g_object_get_data(G_OBJECT(item), "folder-path"));
+    
+    if (path) {
+        comicList->loadComicsFromDirectory(path);
     }
     
-    g_value_unset(&pathValue);
+    g_object_unref(G_OBJECT(item));
 }
 
 } // namespace Librairie

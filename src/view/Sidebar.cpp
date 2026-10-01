@@ -47,19 +47,11 @@ Sidebar::Sidebar() {
                          GtkWidget* box = gtk_list_item_get_child(list_item);
                          GtkWidget* label = gtk_widget_get_last_child(box);
                          
-                         // Get the tree list model from the list view
-                         GtkListView* listView = GTK_LIST_VIEW(gtk_widget_get_parent(gtk_widget_get_parent(box)));
-                         GtkTreeListModel* model = GTK_TREE_LIST_MODEL(gtk_list_view_get_model(listView));
-                         
-                         // Get the name value from the row
-                         GValue nameValue = G_VALUE_INIT;
-                         g_value_init(&nameValue, G_TYPE_STRING);
-                         if (gtk_tree_list_model_get_value(model, row, 0, &nameValue)) {
-                             if (G_VALUE_HOLDS(&nameValue, G_TYPE_STRING)) {
-                                 gtk_label_set_text(GTK_LABEL(label), g_value_get_string(&nameValue));
-                             }
+                         // Get the name and path from the row's data
+                         const gchar* name = static_cast<const gchar*>(g_object_get_data(G_OBJECT(row), "folder-name"));
+                         if (name) {
+                             gtk_label_set_text(GTK_LABEL(label), name);
                          }
-                         g_value_unset(&nameValue);
                      }), nullptr);
     
     gtk_list_view_set_factory(GTK_LIST_VIEW(listView), factory);
@@ -93,59 +85,36 @@ void Sidebar::loadFileSystem() {
     rootFolder = std::make_shared<Folder>(homeDir);
     
     // Create root row with data
-    GValue rootValues[3];
-    rootValues[0] = G_VALUE_INIT; // name
-    rootValues[1] = G_VALUE_INIT; // path
-    rootValues[2] = G_VALUE_INIT; // is_leaf
-    
-    g_value_init(&rootValues[0], G_TYPE_STRING);
-    g_value_init(&rootValues[1], G_TYPE_STRING);
-    g_value_init(&rootValues[2], G_TYPE_BOOLEAN);
-    
-    g_value_set_string(&rootValues[0], rootFolder->getDisplayName().c_str());
-    g_value_set_string(&rootValues[1], rootFolder->path.c_str());
-    g_value_set_boolean(&rootValues[2], FALSE);
-    
     GtkTreeListRow* rootRow = gtk_tree_list_row_new();
-    gtk_tree_list_row_set_values(rootRow, 3, rootValues);
+    
+    // Store folder data as object data
+    g_object_set_data_full(G_OBJECT(rootRow), "folder-name", 
+                          g_strdup(rootFolder->getDisplayName().c_str()), g_free);
+    g_object_set_data_full(G_OBJECT(rootRow), "folder-path", 
+                          g_strdup(rootFolder->path.c_str()), g_free);
+    g_object_set_data(G_OBJECT(rootRow), "is-leaf", GINT_TO_POINTER(FALSE));
     
     gtk_tree_list_model_append(treeListModel, rootRow);
     
     // Load root folder contents
     rootFolder->loadContents();
     addFolderToModel(rootRow, rootFolder);
-    
-    // Cleanup values
-    for (int i = 0; i < 3; i++) {
-        g_value_unset(&rootValues[i]);
-    }
 }
 
 void Sidebar::addFolderToModel(GtkTreeListRow* parentRow, const std::shared_ptr<Folder>& folder) {
     // Add subfolders
     for (const auto& subfolder : folder->subfolders) {
-        GValue values[3];
-        values[0] = G_VALUE_INIT; // name
-        values[1] = G_VALUE_INIT; // path
-        values[2] = G_VALUE_INIT; // is_leaf
-        
-        g_value_init(&values[0], G_TYPE_STRING);
-        g_value_init(&values[1], G_TYPE_STRING);
-        g_value_init(&values[2], G_TYPE_BOOLEAN);
-        
-        g_value_set_string(&values[0], subfolder->getDisplayName().c_str());
-        g_value_set_string(&values[1], subfolder->path.c_str());
-        g_value_set_boolean(&values[2], subfolder->subfolders.empty() && subfolder->comics.empty());
-        
         GtkTreeListRow* row = gtk_tree_list_row_new();
-        gtk_tree_list_row_set_values(row, 3, values);
+        
+        // Store folder data as object data
+        g_object_set_data_full(G_OBJECT(row), "folder-name", 
+                              g_strdup(subfolder->getDisplayName().c_str()), g_free);
+        g_object_set_data_full(G_OBJECT(row), "folder-path", 
+                              g_strdup(subfolder->path.c_str()), g_free);
+        g_object_set_data(G_OBJECT(row), "is-leaf", 
+                         GINT_TO_POINTER(subfolder->subfolders.empty() && subfolder->comics.empty()));
         
         gtk_tree_list_row_insert_child(parentRow, -1, row);
-        
-        // Cleanup values
-        for (int i = 0; i < 3; i++) {
-            g_value_unset(&values[i]);
-        }
     }
 }
 
@@ -159,55 +128,34 @@ void Sidebar::handleActivate(GtkListView* view, guint position) {
     GtkTreeListRow* row = gtk_tree_list_model_get_row(model, position);
     if (row == nullptr) return;
     
-    // Get the is_leaf value from the row
-    GValue isLeafValue = G_VALUE_INIT;
-    g_value_init(&isLeafValue, G_TYPE_BOOLEAN);
-    if (gtk_tree_list_model_get_value(model, row, 2, &isLeafValue)) {
-        gboolean isLeaf = g_value_get_boolean(&isLeafValue);
-        g_value_unset(&isLeafValue);
-        
-        if (!isLeaf) {
-            // Check if this row has children already
-            guint nChildren = gtk_tree_list_row_get_n_children(row);
-            if (nChildren == 0) {
-                // Get the path value from the row
-                GValue pathValue = G_VALUE_INIT;
-                g_value_init(&pathValue, G_TYPE_STRING);
-                if (gtk_tree_list_model_get_value(model, row, 1, &pathValue)) {
-                    const gchar* folderPath = g_value_get_string(&pathValue);
-                    g_value_unset(&pathValue);
+    // Get the is_leaf value from the row's data
+    gboolean isLeaf = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "is-leaf"));
+    
+    if (!isLeaf) {
+        // Check if this row has children already
+        guint nChildren = gtk_tree_list_row_get_n_children(row);
+        if (nChildren == 0) {
+            // Get the path from the row's data
+            const gchar* folderPath = static_cast<const gchar*>(g_object_get_data(G_OBJECT(row), "folder-path"));
+            
+            if (folderPath) {
+                // Create folder and load contents
+                auto folder = std::make_shared<Folder>(folderPath);
+                folder->loadContents();
+                
+                // Add children to model
+                for (const auto& subfolder : folder->subfolders) {
+                    GtkTreeListRow* childRow = gtk_tree_list_row_new();
                     
-                    if (folderPath) {
-                        // Create folder and load contents
-                        auto folder = std::make_shared<Folder>(folderPath);
-                        folder->loadContents();
-                        
-                        // Add children to model
-                        for (const auto& subfolder : folder->subfolders) {
-                            GValue childValues[3];
-                            childValues[0] = G_VALUE_INIT;
-                            childValues[1] = G_VALUE_INIT;
-                            childValues[2] = G_VALUE_INIT;
-                            
-                            g_value_init(&childValues[0], G_TYPE_STRING);
-                            g_value_init(&childValues[1], G_TYPE_STRING);
-                            g_value_init(&childValues[2], G_TYPE_BOOLEAN);
-                            
-                            g_value_set_string(&childValues[0], subfolder->getDisplayName().c_str());
-                            g_value_set_string(&childValues[1], subfolder->path.c_str());
-                            g_value_set_boolean(&childValues[2], subfolder->subfolders.empty() && subfolder->comics.empty());
-                            
-                            GtkTreeListRow* childRow = gtk_tree_list_row_new();
-                            gtk_tree_list_row_set_values(childRow, 3, childValues);
-                            
-                            gtk_tree_list_row_insert_child(row, -1, childRow);
-                            
-                            // Cleanup values
-                            for (int i = 0; i < 3; i++) {
-                                g_value_unset(&childValues[i]);
-                            }
-                        }
-                    }
+                    // Store folder data as object data
+                    g_object_set_data_full(G_OBJECT(childRow), "folder-name", 
+                                          g_strdup(subfolder->getDisplayName().c_str()), g_free);
+                    g_object_set_data_full(G_OBJECT(childRow), "folder-path", 
+                                          g_strdup(subfolder->path.c_str()), g_free);
+                    g_object_set_data(G_OBJECT(childRow), "is-leaf", 
+                                     GINT_TO_POINTER(subfolder->subfolders.empty() && subfolder->comics.empty()));
+                    
+                    gtk_tree_list_row_insert_child(row, -1, childRow);
                 }
             }
         }
