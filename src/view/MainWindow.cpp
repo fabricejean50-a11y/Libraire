@@ -72,21 +72,17 @@ void MainWindow::handleSelectionChanged(GtkListView* view) {
     GtkTreeListRow* row = gtk_tree_list_model_get_row(treeModel, firstSelected);
     if (row == nullptr) return;
     
-    // Get the path value using g_object_get_property
+    // Get the path value using the tree list model
     GValue pathValue = G_VALUE_INIT;
     g_value_init(&pathValue, G_TYPE_STRING);
     
-    // Get the item from the row
-    GObject* item = gtk_tree_list_row_get_item(row);
-    if (item != nullptr) {
-        g_object_get_property(item, "item", &pathValue);
-        g_object_unref(item);
-    }
-    
-    if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
-        const gchar* path = g_value_get_string(&pathValue);
-        if (path) {
-            comicList->loadComicsFromDirectory(path);
+    // Use gtk_tree_list_model_get_value to get the value at the row's position
+    if (gtk_tree_list_model_get_value(treeModel, row, 1, &pathValue)) {
+        if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
+            const gchar* path = g_value_get_string(&pathValue);
+            if (path) {
+                comicList->loadComicsFromDirectory(path);
+            }
         }
     }
     
