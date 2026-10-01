@@ -6,6 +6,9 @@
 namespace Librairie {
 
 Application::Application(int argc, char** argv) {
+    // Initialize libadwaita
+    adw_init(&argc, &argv);
+    
     // Create GTK application
     app = gtk_application_new("org.librairie.App", G_APPLICATION_DEFAULT_FLAGS);
     
@@ -29,12 +32,6 @@ void Application::onActivate(GtkApplication* application, gpointer userData) {
 }
 
 int Application::run() {
-    int argc = 0;
-    char** argv = nullptr;
-    
-    // Initialize libadwaita
-    adw_init(&argc, &argv);
-    
     // Run the application
     int status = g_application_run(G_APPLICATION(app), 0, nullptr);
     
