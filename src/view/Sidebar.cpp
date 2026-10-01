@@ -17,8 +17,9 @@ Sidebar::Sidebar() {
     
     // Create tree view
     treeView = gtk_tree_view_new_with_model(GTK_TREE_MODEL(treeStore));
-    gtk_tree_view_set_hexpand(GTK_TREE_VIEW(treeView), TRUE);
-    gtk_tree_view_set_vexpand(GTK_TREE_VIEW(treeView), TRUE);
+    gtk_widget_set_hexpand(treeView, TRUE);
+    gtk_widget_set_vexpand(treeView, TRUE);
+    gtk_widget_set_size_request(treeView, -1, -1);
     
     // Create column for folder names
     GtkCellRenderer* renderer = gtk_cell_renderer_text_new();
@@ -92,19 +93,17 @@ void Sidebar::handleRowActivated(GtkTreeView* view, GtkTreePath* path,
     GtkTreeIter iter;
     if (gtk_tree_model_get_iter(GTK_TREE_MODEL(treeStore), &iter, path)) {
         gboolean isLeaf;
-        gtk_tree_store_get(treeStore, &iter, COLUMN_IS_LEAF, &isLeaf, -1);
+        gtk_tree_model_get(GTK_TREE_MODEL(treeStore), &iter, COLUMN_IS_LEAF, &isLeaf, -1);
         
         if (!isLeaf) {
             // Check if this node has children already
             if (!gtk_tree_model_iter_has_child(GTK_TREE_MODEL(treeStore), &iter)) {
                 // Get the folder path
                 gchar* folderPath = nullptr;
-                gtk_tree_store_get(treeStore, &iter, COLUMN_PATH, &folderPath, -1);
+                gtk_tree_model_get(GTK_TREE_MODEL(treeStore), &iter, COLUMN_PATH, &folderPath, -1);
                 
                 if (folderPath) {
                     // Find the folder in our model
-                    // This is a simplified approach - in a real app, you'd have a mapping
-                    // between tree iterators and folder objects
                     auto folder = std::make_shared<Folder>(folderPath);
                     folder->loadContents();
                     

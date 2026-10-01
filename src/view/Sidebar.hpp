@@ -13,7 +13,7 @@ public:
     ~Sidebar();
     
     GtkWidget* getWidget() const { return scrolledWindow; }
-    GtkTreeView* getTreeView() const { return GTK_TREE_VIEW(treeView); }
+    GtkWidget* getTreeView() const { return treeView; }
     
     void loadFileSystem();
     

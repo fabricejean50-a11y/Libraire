@@ -25,7 +25,7 @@ MainWindow::MainWindow(GtkApplication* app) {
     comicList = new ComicList();
     gtk_paned_set_end_child(GTK_PANED(paned), comicList->getWidget());
     
-    // Connect signals
+    // Connect signals - use GtkTreeView's selection signal directly
     GtkTreeSelection* selection = gtk_tree_view_get_selection(sidebar->getTreeView());
     g_signal_connect(selection, "changed", 
                      G_CALLBACK(onSidebarSelectionChanged), this);
