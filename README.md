@@ -1,109 +1,96 @@
-# Comic Library - Gestionnaire de BD et Manga
+# Librairie - Comic Library for GNOME (C++ GTK4)
 
-Une application GNOME moderne pour gérer et lire vos collections de BD et Manga au format CBZ.
+A modern comic library application for GNOME, built with C++, GTK4, and libadwaita. Inspired by the macOS Librairie app.
 
-## Prérequis
+## Features
 
-- GNOME 50+ ou GTK 4.0+
-- libadwaita 1.4+
-- Vala compiler (valac)
-- Meson build system
-- pkg-config
+- **Folder Tree Navigation** - Browse your comic collection with a sidebar
+- **Comic List Display** - View CBZ/CBR files in the selected directory
+- **Modern GNOME UI** - Uses GTK4 and libadwaita for a native look
+- **Comic Metadata** - Support for comic metadata (title, series, number, etc.)
 
-### Installation des dépendances (Debian/Ubuntu)
+## Dependencies
+
+### Debian/Ubuntu
+```bash
+sudo apt install -y g++ cmake pkg-config libgtk-4-dev libadwaita-1-dev
+```
+
+### Fedora
+```bash
+sudo dnf install -y g++ cmake pkgconf gtk4-devel libadwaita-devel
+```
+
+### Arch Linux
+```bash
+sudo pacman -S g++ cmake pkgconf gtk4 libadwaita
+```
+
+## Building
 
 ```bash
-sudo apt update
-sudo apt install -y valac meson libgtk-4-dev libadwaita-1-dev pkg-config
+mkdir build
+cd build
+cmake ..
+cmake --build .
 ```
 
-### Installation des dépendances (Fedora)
+## Running
 
 ```bash
-sudo dnf install -y vala meson gtk4-devel libadwaita-devel pkg-config
+./librairie
 ```
 
-### Installation des dépendances (Arch Linux)
-
-```bash
-sudo pacman -S vala meson gtk4 libadwaita pkgconf
-```
-
-## Compilation
-
-```bash
-cd comic_library
-meson setup builddir --prefix=/usr/local
-cd builddir
-ninja
-```
-
-## Installation
-
-```bash
-sudo ninja install
-```
-
-## Exécution
-
-```bash
-comic-library
-```
-
-Ou depuis le répertoire de build :
-
-```bash
-./comic-library
-```
-
-## Fonctionnalités
-
-### Partie 1: Gestion de bibliothèque (implémentée)
-- **Arborescence des dossiers** : Navigation dans vos répertoires
-- **Liste des fichiers CBZ** : Affichage des fichiers CBZ dans le dossier sélectionné
-- **Affichage des métadonnées** : Taille des fichiers
-- **Interface moderne** : Utilisation de libadwaita pour une intégration parfaite avec GNOME
-
-### Partie 2: Lecture (à implémenter)
-- Ouverture des fichiers CBZ
-- Visualisation des images
-- Navigation entre les pages
-- Zoom et rotation
-
-## Structure du projet
+## Project Structure
 
 ```
-comic_library/
-├── meson.build          # Configuration de compilation
-├── README.md           # Documentation
+librairie_cpp/
+├── CMakeLists.txt          # CMake build configuration
+├── README.md              # This file
 └── src/
-    ├── main.vala       # Point d'entrée de l'application
-    ├── window.vala     # Fenêtre principale
-    ├── file_tree.vala  # Arborescence des fichiers
-    ├── comic_list.vala # Liste des fichiers CBZ
-    └── library_view.vala # Vue de la bibliothèque
+    ├── main.cpp           # Application entry point
+    ├── controller/
+    │   ├── Application.hpp
+    │   └── Application.cpp # GTK application controller
+    ├── model/
+    │   ├── Comic.hpp
+    │   ├── Comic.cpp       # Comic data model
+    │   ├── Folder.hpp
+    │   └── Folder.cpp      # Folder/directory model
+    ├── utils/
+    │   ├── FileUtils.hpp
+    │   └── FileUtils.cpp   # File system utilities
+    └── view/
+        ├── MainWindow.hpp
+        ├── MainWindow.cpp   # Main application window
+        ├── Sidebar.hpp
+        ├── Sidebar.cpp     # Folder tree sidebar
+        ├── ComicList.hpp
+        └── ComicList.cpp    # Comic list display
 ```
 
 ## Architecture
 
-L'application utilise une architecture split-view :
-- **Panneau gauche** : `FileTree` - Arborescence des dossiers navigable
-- **Panneau droit** : `ComicList` - Liste des fichiers CBZ dans le dossier sélectionné
+### Model Layer
+- **Comic** - Represents a comic book with metadata
+- **Folder** - Represents a directory containing comics or subfolders
 
-## Personnalisation
+### View Layer
+- **MainWindow** - Main application window with split view
+- **Sidebar** - Tree view for folder navigation
+- **ComicList** - List view for displaying comics
 
-Vous pouvez modifier le comportement de l'application en ajustant :
-- La position du split view dans `window.vala`
-- Les extensions de fichiers reconnues dans `comic_list.vala`
-- Le style CSS dans `comic_list.vala`
+### Controller Layer
+- **Application** - Main GTK application controller
 
-## Contribution
+## Comic File Support
 
-Les contributions sont les bienvenues ! Ouvrez un PR ou un issue pour :
-- Signaler des bugs
-- Proposer des fonctionnalités
-- Améliorer le code
+The application currently supports:
+- `.cbz` files (ZIP-based comic archives)
+- `.cbr` files (RAR-based comic archives)
+- `.zip` files
+- `.rar` files
 
-## Licence
+## License
 
 GPL-3.0
