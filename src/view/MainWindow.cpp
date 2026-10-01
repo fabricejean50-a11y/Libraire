@@ -67,34 +67,30 @@ void MainWindow::handleSelectionChanged(GtkListView* view) {
     
     if (firstSelected == GTK_INVALID_LIST_POSITION) return;
     
-    // Get the item from the model
-    GObject* itemObj = g_list_model_get_object(listModel, firstSelected);
+    // Get the path from the tree list model directly
+    GtkTreeListModel* treeModel = GTK_TREE_LIST_MODEL(listModel);
+    GtkTreeListRow* row = gtk_tree_list_model_get_row(treeModel, firstSelected);
+    if (row == nullptr) return;
     
-    if (itemObj == nullptr) return;
-    
-    // The item is a GtkTreeListRow, get its path value
+    // Get the path value using g_object_get_property
     GValue pathValue = G_VALUE_INIT;
     g_value_init(&pathValue, G_TYPE_STRING);
     
-    // Get the value from the tree list model
-    GtkTreeListModel* treeModel = GTK_TREE_LIST_MODEL(listModel);
-    GtkTreeListRow* row = gtk_tree_list_model_get_row(treeModel, firstSelected);
-    if (row) {
-        GValue tempValue = G_VALUE_INIT;
-        g_value_init(&tempValue, G_TYPE_STRING);
-        if (gtk_tree_list_row_get_value(row, 1, &tempValue)) {
-            if (G_VALUE_HOLDS(&tempValue, G_TYPE_STRING)) {
-                const gchar* path = g_value_get_string(&tempValue);
-                if (path) {
-                    comicList->loadComicsFromDirectory(path);
-                }
-            }
+    // Get the item from the row
+    GObject* item = gtk_tree_list_row_get_item(row);
+    if (item != nullptr) {
+        g_object_get_property(item, "item", &pathValue);
+        g_object_unref(item);
+    }
+    
+    if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
+        const gchar* path = g_value_get_string(&pathValue);
+        if (path) {
+            comicList->loadComicsFromDirectory(path);
         }
-        g_value_unset(&tempValue);
     }
     
     g_value_unset(&pathValue);
-    g_object_unref(itemObj);
 }
 
 } // namespace Librairie
