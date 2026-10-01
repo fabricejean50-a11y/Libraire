@@ -25,10 +25,9 @@ MainWindow::MainWindow(GtkApplication* app) {
     comicList = new ComicList();
     gtk_paned_set_end_child(GTK_PANED(paned), comicList->getWidget());
     
-    // Connect signals - use GtkTreeView's selection signal directly
-    GtkTreeSelection* selection = gtk_tree_view_get_selection(sidebar->getTreeView());
-    g_signal_connect(selection, "changed", 
-                     G_CALLBACK(onSidebarSelectionChanged), this);
+    // Connect signals
+    g_signal_connect(sidebar->getListView(), "activate", 
+                     G_CALLBACK(onSelectionChanged), this);
     
     // Set resize behavior
     gtk_paned_set_resize_start_child(GTK_PANED(paned), TRUE);
@@ -46,23 +45,25 @@ void MainWindow::show() {
     gtk_window_present(GTK_WINDOW(window));
 }
 
-void MainWindow::onSidebarSelectionChanged(GtkTreeSelection* selection, gpointer userData) {
+void MainWindow::onSelectionChanged(GtkListView* view, guint position, gpointer userData) {
     MainWindow* self = static_cast<MainWindow*>(userData);
-    self->handleSidebarSelectionChanged(selection);
+    self->handleSelectionChanged(view, position);
 }
 
-void MainWindow::handleSidebarSelectionChanged(GtkTreeSelection* selection) {
-    GtkTreeModel* model;
-    GtkTreeIter iter;
+void MainWindow::handleSelectionChanged(GtkListView* view, guint position) {
+    GtkTreeListRow* row = gtk_list_view_get_row_at_pos(view, position);
+    if (row == nullptr) return;
     
-    if (gtk_tree_selection_get_selected(selection, &model, &iter)) {
-        gchar* path = nullptr;
-        gtk_tree_model_get(model, &iter, 1, &path, -1); // Column 1 contains the full path
-        
-        if (path) {
-            comicList->loadComicsFromDirectory(path);
-            g_free(path);
-        }
+    // Get the tree list model from the sidebar
+    GtkTreeListModel* model = GTK_TREE_LIST_MODEL(gtk_list_view_get_model(view));
+    if (model == nullptr) return;
+    
+    // Get the path from the row
+    g_autoptr(GValue) pathValue = gtk_tree_list_model_get_value(model, row, 1); // COLUMN_PATH
+    const gchar* path = g_value_get_string(pathValue);
+    
+    if (path) {
+        comicList->loadComicsFromDirectory(path);
     }
 }
 

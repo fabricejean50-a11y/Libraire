@@ -12,28 +12,55 @@ Sidebar::Sidebar() {
     gtk_widget_set_hexpand(scrolledWindow, TRUE);
     gtk_widget_set_vexpand(scrolledWindow, TRUE);
     
-    // Create tree store
-    treeStore = gtk_tree_store_new(NUM_COLUMNS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN);
+    // Create tree list model with columns
+    GType columnTypes[NUM_COLUMNS] = {G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN};
+    treeListModel = gtk_tree_list_model_new(columnTypes, NUM_COLUMNS, nullptr);
     
-    // Create tree view
-    treeView = gtk_tree_view_new_with_model(GTK_TREE_MODEL(treeStore));
+    // Create list view
+    listView = gtk_list_view_new(GTK_SELECTION_MODEL(gtk_tree_list_model_get_selection(treeListModel)),
+                                  nullptr);
+    gtk_widget_set_hexpand(listView, TRUE);
+    gtk_widget_set_vexpand(listView, TRUE);
     
-    // Set expand properties using widget functions
-    gtk_widget_set_hexpand(treeView, TRUE);
-    gtk_widget_set_vexpand(treeView, TRUE);
+    // Create factory for list items
+    GtkListItemFactory* factory = gtk_signal_list_item_factory_new();
     
-    // Create column for folder names
-    GtkCellRenderer* renderer = gtk_cell_renderer_text_new();
-    GtkTreeViewColumn* column = gtk_tree_view_column_new_with_attributes(
-        "Folders", renderer, "text", COLUMN_NAME, NULL);
-    gtk_tree_view_append_column(GTK_TREE_VIEW(treeView), column);
+    // Setup factory to create widgets for each item
+    g_signal_connect(factory, "setup", 
+                     G_CALLBACK(+[](GtkSignalListItemFactory* self, GtkListItem* list_item, gpointer user_data) {
+                         GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+                         GtkWidget* image = gtk_image_new_from_icon_name("folder-symbolic");
+                         GtkWidget* label = gtk_label_new("");
+                         
+                         gtk_label_set_xalign(GTK_LABEL(label), 0.0);
+                         gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+                         
+                         gtk_box_append(GTK_BOX(box), image);
+                         gtk_box_append(GTK_BOX(box), label);
+                         
+                         gtk_list_item_set_child(list_item, box);
+                     }), nullptr);
     
-    // Add tree view to scrolled window
-    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolledWindow), treeView);
+    g_signal_connect(factory, "bind", 
+                     G_CALLBACK(+[](GtkSignalListItemFactory* self, GtkListItem* list_item, gpointer user_data) {
+                         GtkTreeListRow* row = gtk_list_item_get_item(list_item);
+                         GtkWidget* box = gtk_list_item_get_child(list_item);
+                         GtkWidget* label = gtk_widget_get_last_child(box);
+                         
+                         g_autoptr(GValue) value = gtk_tree_list_model_get_value(treeListModel, row, COLUMN_NAME);
+                         if (value != nullptr) {
+                             gtk_label_set_text(GTK_LABEL(label), g_value_get_string(value));
+                         }
+                     }), nullptr);
+    
+    gtk_list_view_set_factory(GTK_LIST_VIEW(listView), factory);
+    
+    // Add list view to scrolled window
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolledWindow), listView);
     
     // Connect signals
-    g_signal_connect(treeView, "row-activated", 
-                     G_CALLBACK(onRowActivated), this);
+    g_signal_connect(listView, "activate", 
+                     G_CALLBACK(onActivate), this);
     
     // Load file system
     loadFileSystem();
@@ -45,7 +72,7 @@ Sidebar::~Sidebar() {
 
 void Sidebar::loadFileSystem() {
     // Clear existing data
-    gtk_tree_store_clear(treeStore);
+    gtk_tree_list_model_splice(treeListModel, 0, gtk_tree_list_model_get_n_items(treeListModel), nullptr);
     
     // Get home directory
     const char* homeDir = g_get_home_dir();
@@ -56,70 +83,88 @@ void Sidebar::loadFileSystem() {
     // Create root folder
     rootFolder = std::make_shared<Folder>(homeDir);
     
-    // Add root to tree store
-    GtkTreeIter rootIter;
-    gtk_tree_store_append(treeStore, &rootIter, nullptr);
-    gtk_tree_store_set(treeStore, &rootIter,
-                       COLUMN_NAME, rootFolder->getDisplayName().c_str(),
-                       COLUMN_PATH, rootFolder->path.c_str(),
-                       COLUMN_IS_LEAF, FALSE,
-                       -1);
+    // Add root to model
+    GtkTreeListRow* rootRow = gtk_tree_list_row_new();
+    g_autoptr(GValue) nameValue = g_value_init(G_TYPE_STRING, nullptr);
+    g_value_set_string(nameValue, rootFolder->getDisplayName().c_str());
+    g_autoptr(GValue) pathValue = g_value_init(G_TYPE_STRING, nullptr);
+    g_value_set_string(pathValue, rootFolder->path.c_str());
+    g_autoptr(GValue) leafValue = g_value_init(G_TYPE_BOOLEAN, nullptr);
+    g_value_set_boolean(leafValue, FALSE);
+    
+    gtk_tree_list_row_set_values(rootRow, COLUMN_NAME, nameValue,
+                                          COLUMN_PATH, pathValue,
+                                          COLUMN_IS_LEAF, leafValue,
+                                          -1);
+    
+    gtk_tree_list_model_append(treeListModel, rootRow);
     
     // Load root folder contents
     rootFolder->loadContents();
-    populateTreeStore(&rootIter, rootFolder);
+    addFolderToModel(rootRow, rootFolder);
 }
 
-void Sidebar::populateTreeStore(GtkTreeIter* parentIter, const std::shared_ptr<Folder>& folder) {
+void Sidebar::addFolderToModel(GtkTreeListRow* parentRow, const std::shared_ptr<Folder>& folder) {
     // Add subfolders
     for (const auto& subfolder : folder->subfolders) {
-        GtkTreeIter iter;
-        gtk_tree_store_append(treeStore, &iter, parentIter);
-        gtk_tree_store_set(treeStore, &iter,
-                           COLUMN_NAME, subfolder->getDisplayName().c_str(),
-                           COLUMN_PATH, subfolder->path.c_str(),
-                           COLUMN_IS_LEAF, subfolder->subfolders.empty() && subfolder->comics.empty(),
-                           -1);
+        GtkTreeListRow* row = gtk_tree_list_row_new();
+        g_autoptr(GValue) nameValue = g_value_init(G_TYPE_STRING, nullptr);
+        g_value_set_string(nameValue, subfolder->getDisplayName().c_str());
+        g_autoptr(GValue) pathValue = g_value_init(G_TYPE_STRING, nullptr);
+        g_value_set_string(pathValue, subfolder->path.c_str());
+        g_autoptr(GValue) leafValue = g_value_init(G_TYPE_BOOLEAN, nullptr);
+        g_value_set_boolean(leafValue, subfolder->subfolders.empty() && subfolder->comics.empty());
+        
+        gtk_tree_list_row_set_values(row, COLUMN_NAME, nameValue,
+                                      COLUMN_PATH, pathValue,
+                                      COLUMN_IS_LEAF, leafValue,
+                                      -1);
+        
+        gtk_tree_list_model_append(treeListModel, row);
     }
 }
 
-void Sidebar::onRowActivated(GtkTreeView* view, GtkTreePath* path, 
-                             GtkTreeViewColumn* column, gpointer userData) {
+void Sidebar::onActivate(GtkListView* view, guint position, gpointer userData) {
     Sidebar* self = static_cast<Sidebar*>(userData);
-    self->handleRowActivated(view, path, column);
+    self->handleActivate(view, position);
 }
 
-void Sidebar::handleRowActivated(GtkTreeView* view, GtkTreePath* path, 
-                                GtkTreeViewColumn* column) {
-    GtkTreeIter iter;
-    if (gtk_tree_model_get_iter(GTK_TREE_MODEL(treeStore), &iter, path)) {
-        gboolean isLeaf;
-        gtk_tree_model_get(GTK_TREE_MODEL(treeStore), &iter, COLUMN_IS_LEAF, &isLeaf, -1);
-        
-        if (!isLeaf) {
-            // Check if this node has children already
-            if (!gtk_tree_model_iter_has_child(GTK_TREE_MODEL(treeStore), &iter)) {
-                // Get the folder path
-                gchar* folderPath = nullptr;
-                gtk_tree_model_get(GTK_TREE_MODEL(treeStore), &iter, COLUMN_PATH, &folderPath, -1);
+void Sidebar::handleActivate(GtkListView* view, guint position) {
+    GtkTreeListRow* row = gtk_list_view_get_row_at_pos(view, position);
+    if (row == nullptr) return;
+    
+    g_autoptr(GValue) isLeafValue = gtk_tree_list_model_get_value(treeListModel, row, COLUMN_IS_LEAF);
+    gboolean isLeaf = g_value_get_boolean(isLeafValue);
+    
+    if (!isLeaf) {
+        // Check if this row has children already
+        guint nChildren = gtk_tree_list_row_get_n_children(row);
+        if (nChildren == 0) {
+            // Get the folder path
+            g_autoptr(GValue) pathValue = gtk_tree_list_model_get_value(treeListModel, row, COLUMN_PATH);
+            const gchar* folderPath = g_value_get_string(pathValue);
+            
+            if (folderPath) {
+                // Create folder and load contents
+                auto folder = std::make_shared<Folder>(folderPath);
+                folder->loadContents();
                 
-                if (folderPath) {
-                    // Create folder and load contents
-                    auto folder = std::make_shared<Folder>(folderPath);
-                    folder->loadContents();
+                // Add children to model
+                for (const auto& subfolder : folder->subfolders) {
+                    GtkTreeListRow* childRow = gtk_tree_list_row_new();
+                    g_autoptr(GValue) childNameValue = g_value_init(G_TYPE_STRING, nullptr);
+                    g_value_set_string(childNameValue, subfolder->getDisplayName().c_str());
+                    g_autoptr(GValue) childPathValue = g_value_init(G_TYPE_STRING, nullptr);
+                    g_value_set_string(childPathValue, subfolder->path.c_str());
+                    g_autoptr(GValue) childLeafValue = g_value_init(G_TYPE_BOOLEAN, nullptr);
+                    g_value_set_boolean(childLeafValue, subfolder->subfolders.empty() && subfolder->comics.empty());
                     
-                    // Add children to tree store
-                    GtkTreeIter childIter;
-                    for (const auto& subfolder : folder->subfolders) {
-                        gtk_tree_store_append(treeStore, &childIter, &iter);
-                        gtk_tree_store_set(treeStore, &childIter,
-                                           COLUMN_NAME, subfolder->getDisplayName().c_str(),
-                                           COLUMN_PATH, subfolder->path.c_str(),
-                                           COLUMN_IS_LEAF, subfolder->subfolders.empty() && subfolder->comics.empty(),
-                                           -1);
-                    }
+                    gtk_tree_list_row_set_values(childRow, COLUMN_NAME, childNameValue,
+                                                  COLUMN_PATH, childPathValue,
+                                                  COLUMN_IS_LEAF, childLeafValue,
+                                                  -1);
                     
-                    g_free(folderPath);
+                    gtk_tree_list_row_insert_child(row, -1, childRow);
                 }
             }
         }

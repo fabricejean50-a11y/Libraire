@@ -3,6 +3,7 @@
 #include <gtk/gtk.h>
 #include <vector>
 #include <memory>
+#include <string>
 #include "../model/Comic.hpp"
 
 namespace Librairie {

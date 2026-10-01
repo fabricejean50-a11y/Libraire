@@ -22,10 +22,8 @@ private:
     ComicList* comicList;
     
     // Signal handlers
-    static void onSidebarSelectionChanged(GtkTreeSelection* selection, gpointer userData);
-    static void onActivate(GtkApplication* app, gpointer userData);
-    
-    void handleSidebarSelectionChanged(GtkTreeSelection* selection);
+    static void onSelectionChanged(GtkListView* view, guint position, gpointer userData);
+    void handleSelectionChanged(GtkListView* view, guint position);
 };
 
 } // namespace Librairie

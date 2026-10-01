@@ -1,6 +1,7 @@
 #include "ComicList.hpp"
 #include "utils/FileUtils.hpp"
 #include <gtk/gtk.h>
+#include <sys/stat.h>
 
 namespace Librairie {
 
@@ -73,7 +74,7 @@ void ComicList::setComics(const std::vector<std::shared_ptr<Comic>>& comics) {
 void ComicList::clearList() {
     // Remove all children from list box
     GtkWidget* child;
-    while ((child = gtk_widget_get_first_child(listBox)) != NULL) {
+    while ((child = gtk_widget_get_first_child(listBox)) != nullptr) {
         gtk_list_box_remove(GTK_LIST_BOX(listBox), child);
     }
 }
@@ -92,7 +93,7 @@ void ComicList::addComicToList(const std::shared_ptr<Comic>& comic) {
     gtk_widget_set_margin_bottom(box, 8);
     
     // Add icon
-    GtkWidget* icon = gtk_image_new_from_icon_name("application-zip");
+    GtkWidget* icon = gtk_image_new_from_icon_name("application-zip-symbolic");
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 32);
     gtk_box_append(GTK_BOX(box), icon);
     
@@ -108,9 +109,11 @@ void ComicList::addComicToList(const std::shared_ptr<Comic>& comic) {
     gtk_box_append(GTK_BOX(infoBox), titleLabel);
     
     // Add size label
-    uint64_t fileSize = FileUtils::fileExists(comic->fullpath) ? 
-        static_cast<uint64_t>(g_file_test(comic->fullpath.c_str(), G_FILE_TEST_EXISTS) ? 
-        g_stat(comic->fullpath.c_str(), nullptr).st_size : 0) : 0;
+    struct stat fileStat;
+    uint64_t fileSize = 0;
+    if (stat(comic->fullpath.c_str(), &fileStat) == 0) {
+        fileSize = fileStat.st_size;
+    }
     std::string sizeStr = FileUtils::getFileSizeString(fileSize);
     GtkWidget* sizeLabel = gtk_label_new(sizeStr.c_str());
     gtk_label_set_xalign(GTK_LABEL(sizeLabel), 0.0);

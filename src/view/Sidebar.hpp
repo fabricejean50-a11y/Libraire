@@ -3,6 +3,7 @@
 #include <gtk/gtk.h>
 #include <vector>
 #include <memory>
+#include <string>
 #include "../model/Folder.hpp"
 
 namespace Librairie {
@@ -13,18 +14,19 @@ public:
     ~Sidebar();
     
     GtkWidget* getWidget() const { return scrolledWindow; }
-    GtkWidget* getTreeView() const { return treeView; }
+    GtkWidget* getListView() const { return listView; }
     
     void loadFileSystem();
     
 private:
     GtkWidget* scrolledWindow;
-    GtkWidget* treeView;
-    GtkTreeStore* treeStore;
+    GtkWidget* listView;
+    GtkTreeListModel* treeListModel;
+    GtkTreeListRow* rootRow;
     
     std::shared_ptr<Folder> rootFolder;
     
-    // Tree model columns
+    // Column indices for the tree list model
     enum Column {
         COLUMN_NAME,
         COLUMN_PATH,
@@ -32,11 +34,15 @@ private:
         NUM_COLUMNS
     };
     
-    void populateTreeStore(GtkTreeIter* parentIter, const std::shared_ptr<Folder>& folder);
-    static void onRowActivated(GtkTreeView* view, GtkTreePath* path, 
-                              GtkTreeViewColumn* column, gpointer userData);
-    void handleRowActivated(GtkTreeView* view, GtkTreePath* path, 
-                           GtkTreeViewColumn* column);
+    // Store folder data for each row
+    struct FolderData {
+        std::shared_ptr<Folder> folder;
+        bool loaded = false;
+    };
+    
+    void addFolderToModel(GtkTreeListRow* parentRow, const std::shared_ptr<Folder>& folder);
+    static void onActivate(GtkListView* view, guint position, gpointer userData);
+    void handleActivate(GtkListView* view, guint position);
 };
 
 } // namespace Librairie
