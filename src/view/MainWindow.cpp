@@ -53,23 +53,34 @@ void MainWindow::onSelectionChanged(GtkSelectionModel* model, guint position, gu
 
 void MainWindow::handleSelectionChanged(GtkListView* view) {
     GtkSelectionModel* selectionModel = gtk_list_view_get_model(view);
+    GListModel* listModel = G_LIST_MODEL(gtk_list_view_get_model(view));
+    guint nItems = g_list_model_get_n_items(listModel);
     
-    // Get the first selected position
-    guint firstSelected = gtk_selection_model_get_first_selected(selectionModel);
+    // Find first selected position
+    guint firstSelected = GTK_INVALID_LIST_POSITION;
+    for (guint i = 0; i < nItems; i++) {
+        if (gtk_selection_model_is_selected(selectionModel, i)) {
+            firstSelected = i;
+            break;
+        }
+    }
+    
     if (firstSelected == GTK_INVALID_LIST_POSITION) return;
     
     // Get the item from the model
-    GListModel* listModel = G_LIST_MODEL(gtk_list_view_get_model(view));
     GObject* itemObj = g_list_model_get_object(listModel, firstSelected);
     
     if (itemObj == nullptr) return;
     
-    // The item is a GtkTreeListRow, get its values
+    // The item is a GtkTreeListRow, get its path value
     GValue pathValue = G_VALUE_INIT;
     g_value_init(&pathValue, G_TYPE_STRING);
     
-    // Try to get the path from the row's item property
-    g_object_get_property(itemObj, "item", &pathValue);
+    // Get the value from the tree list model at the row's position
+    GtkTreeListRow* row = gtk_list_view_get_row(view, firstSelected);
+    if (row) {
+        gtk_tree_list_model_get_value(GTK_TREE_LIST_MODEL(listModel), row, 1, &pathValue);
+    }
     
     if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
         const gchar* path = g_value_get_string(&pathValue);
