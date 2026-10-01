@@ -22,7 +22,7 @@ private:
     ComicList* comicList;
     
     // Signal handlers
-    static void onSelectionChanged(GtkListView* view, guint position, gpointer userData);
+    static void onSelectionChanged(GtkSelectionModel* model, guint position, guint n_items, gpointer userData);
     void handleSelectionChanged(GtkListView* view, guint position);
 };
 

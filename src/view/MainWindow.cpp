@@ -26,7 +26,8 @@ MainWindow::MainWindow(GtkApplication* app) {
     gtk_paned_set_end_child(GTK_PANED(paned), comicList->getWidget());
     
     // Connect signals
-    g_signal_connect(sidebar->getListView(), "activate", 
+    GtkSelectionModel* selectionModel = gtk_list_view_get_model(GTK_LIST_VIEW(sidebar->getListView()));
+    g_signal_connect(selectionModel, "selection-changed", 
                      G_CALLBACK(onSelectionChanged), this);
     
     // Set resize behavior
@@ -45,26 +46,39 @@ void MainWindow::show() {
     gtk_window_present(GTK_WINDOW(window));
 }
 
-void MainWindow::onSelectionChanged(GtkListView* view, guint position, gpointer userData) {
+void MainWindow::onSelectionChanged(GtkSelectionModel* model, guint position, guint n_items, gpointer userData) {
     MainWindow* self = static_cast<MainWindow*>(userData);
-    self->handleSelectionChanged(view, position);
+    self->handleSelectionChanged(GTK_LIST_VIEW(self->sidebar->getListView()), position);
 }
 
 void MainWindow::handleSelectionChanged(GtkListView* view, guint position) {
-    GtkTreeListRow* row = gtk_list_view_get_row_at_pos(view, position);
-    if (row == nullptr) return;
+    GtkSelectionModel* selectionModel = gtk_list_view_get_model(view);
+    GtkBitset* selected = gtk_selection_model_get_selection(selectionModel);
     
-    // Get the tree list model from the sidebar
-    GtkTreeListModel* model = GTK_TREE_LIST_MODEL(gtk_list_view_get_model(view));
-    if (model == nullptr) return;
+    if (gtk_bitset_get_size(selected) == 0) return;
     
-    // Get the path from the row
-    g_autoptr(GValue) pathValue = gtk_tree_list_model_get_value(model, row, 1); // COLUMN_PATH
-    const gchar* path = g_value_get_string(pathValue);
+    guint firstSelected = gtk_bitset_get_first(selected);
+    if (firstSelected == G_MAXUINT) return;
     
-    if (path) {
-        comicList->loadComicsFromDirectory(path);
+    // Get the item from the model
+    GListModel* listModel = G_LIST_MODEL(gtk_list_view_get_model(view));
+    GObject* item = g_list_model_get_item(listModel, firstSelected);
+    
+    if (item == nullptr) return;
+    
+    // Get the path from the item (which is a GtkTreeListRow)
+    GValue pathValue = G_VALUE_INIT;
+    g_object_get_property(G_OBJECT(item), "item", &pathValue);
+    
+    if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
+        const gchar* path = g_value_get_string(&pathValue);
+        if (path) {
+            comicList->loadComicsFromDirectory(path);
+        }
     }
+    
+    g_value_unset(&pathValue);
+    g_object_unref(item);
 }
 
 } // namespace Librairie

@@ -26,18 +26,11 @@ private:
     
     std::shared_ptr<Folder> rootFolder;
     
-    // Column indices for the tree list model
-    enum Column {
-        COLUMN_NAME,
-        COLUMN_PATH,
-        COLUMN_IS_LEAF,
-        NUM_COLUMNS
-    };
-    
     // Store folder data for each row
-    struct FolderData {
-        std::shared_ptr<Folder> folder;
-        bool loaded = false;
+    struct RowData {
+        std::string path;
+        std::string name;
+        bool isLeaf;
     };
     
     void addFolderToModel(GtkTreeListRow* parentRow, const std::shared_ptr<Folder>& folder);
