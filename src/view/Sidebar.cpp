@@ -43,13 +43,14 @@ Sidebar::Sidebar() {
     
     g_signal_connect(factory, "bind", 
                      G_CALLBACK(+[](GtkSignalListItemFactory* self, GtkListItem* list_item, gpointer user_data) {
-                         GtkTreeListRow* row = gtk_list_item_get_item(list_item);
+                         GtkTreeListRow* row = GTK_TREE_LIST_ROW(gtk_list_item_get_item(list_item));
                          GtkWidget* box = gtk_list_item_get_child(list_item);
                          GtkWidget* label = gtk_widget_get_last_child(box);
                          
-                         // Get the name from the row
+                         // Get the name value from the row
                          GValue nameValue = G_VALUE_INIT;
-                         g_object_get_property(G_OBJECT(row), "item", &nameValue);
+                         g_value_init(&nameValue, G_TYPE_STRING);
+                         gtk_tree_list_model_get_value(treeListModel, row, COLUMN_NAME, &nameValue);
                          
                          if (G_VALUE_HOLDS(&nameValue, G_TYPE_STRING)) {
                              gtk_label_set_text(GTK_LABEL(label), g_value_get_string(&nameValue));
@@ -156,12 +157,10 @@ void Sidebar::handleActivate(GtkListView* view, guint position) {
     
     // Get the is_leaf value from the row
     GValue isLeafValue = G_VALUE_INIT;
-    g_object_get_property(G_OBJECT(row), "item", &isLeafValue);
+    g_value_init(&isLeafValue, G_TYPE_BOOLEAN);
+    gtk_tree_list_model_get_value(treeListModel, row, COLUMN_IS_LEAF, &isLeafValue);
     
-    gboolean isLeaf = FALSE;
-    if (G_VALUE_HOLDS(&isLeafValue, G_TYPE_BOOLEAN)) {
-        isLeaf = g_value_get_boolean(&isLeafValue);
-    }
+    gboolean isLeaf = g_value_get_boolean(&isLeafValue);
     g_value_unset(&isLeafValue);
     
     if (!isLeaf) {
@@ -170,12 +169,10 @@ void Sidebar::handleActivate(GtkListView* view, guint position) {
         if (nChildren == 0) {
             // Get the path value from the row
             GValue pathValue = G_VALUE_INIT;
-            g_object_get_property(G_OBJECT(row), "item", &pathValue);
+            g_value_init(&pathValue, G_TYPE_STRING);
+            gtk_tree_list_model_get_value(treeListModel, row, COLUMN_PATH, &pathValue);
             
-            const gchar* folderPath = nullptr;
-            if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
-                folderPath = g_value_get_string(&pathValue);
-            }
+            const gchar* folderPath = g_value_get_string(&pathValue);
             g_value_unset(&pathValue);
             
             if (folderPath) {

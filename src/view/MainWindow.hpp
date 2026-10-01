@@ -23,7 +23,7 @@ private:
     
     // Signal handlers
     static void onSelectionChanged(GtkSelectionModel* model, guint position, guint n_items, gpointer userData);
-    void handleSelectionChanged(GtkListView* view, guint position);
+    void handleSelectionChanged(GtkListView* view);
 };
 
 } // namespace Librairie

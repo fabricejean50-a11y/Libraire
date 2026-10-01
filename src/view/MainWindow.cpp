@@ -25,7 +25,7 @@ MainWindow::MainWindow(GtkApplication* app) {
     comicList = new ComicList();
     gtk_paned_set_end_child(GTK_PANED(paned), comicList->getWidget());
     
-    // Connect signals
+    // Connect signals - use selection-changed on the selection model
     GtkSelectionModel* selectionModel = gtk_list_view_get_model(GTK_LIST_VIEW(sidebar->getListView()));
     g_signal_connect(selectionModel, "selection-changed", 
                      G_CALLBACK(onSelectionChanged), this);
@@ -48,27 +48,28 @@ void MainWindow::show() {
 
 void MainWindow::onSelectionChanged(GtkSelectionModel* model, guint position, guint n_items, gpointer userData) {
     MainWindow* self = static_cast<MainWindow*>(userData);
-    self->handleSelectionChanged(GTK_LIST_VIEW(self->sidebar->getListView()), position);
+    self->handleSelectionChanged(GTK_LIST_VIEW(self->sidebar->getListView()));
 }
 
-void MainWindow::handleSelectionChanged(GtkListView* view, guint position) {
+void MainWindow::handleSelectionChanged(GtkListView* view) {
     GtkSelectionModel* selectionModel = gtk_list_view_get_model(view);
-    GtkBitset* selected = gtk_selection_model_get_selection(selectionModel);
     
-    if (gtk_bitset_get_size(selected) == 0) return;
-    
-    guint firstSelected = gtk_bitset_get_first(selected);
-    if (firstSelected == G_MAXUINT) return;
+    // Get the first selected position
+    guint firstSelected = gtk_selection_model_get_first_selected(selectionModel);
+    if (firstSelected == GTK_INVALID_LIST_POSITION) return;
     
     // Get the item from the model
     GListModel* listModel = G_LIST_MODEL(gtk_list_view_get_model(view));
-    GObject* item = g_list_model_get_item(listModel, firstSelected);
+    GObject* itemObj = g_list_model_get_object(listModel, firstSelected);
     
-    if (item == nullptr) return;
+    if (itemObj == nullptr) return;
     
-    // Get the path from the item (which is a GtkTreeListRow)
+    // The item is a GtkTreeListRow, get its values
     GValue pathValue = G_VALUE_INIT;
-    g_object_get_property(G_OBJECT(item), "item", &pathValue);
+    g_value_init(&pathValue, G_TYPE_STRING);
+    
+    // Try to get the path from the row's item property
+    g_object_get_property(itemObj, "item", &pathValue);
     
     if (G_VALUE_HOLDS(&pathValue, G_TYPE_STRING)) {
         const gchar* path = g_value_get_string(&pathValue);
@@ -78,7 +79,7 @@ void MainWindow::handleSelectionChanged(GtkListView* view, guint position) {
     }
     
     g_value_unset(&pathValue);
-    g_object_unref(item);
+    g_object_unref(itemObj);
 }
 
 } // namespace Librairie
