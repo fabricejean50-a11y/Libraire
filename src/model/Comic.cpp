@@ -1,7 +1,8 @@
 #include "Comic.hpp"
-#include "FileUtils.hpp"
+#include "utils/FileUtils.hpp"
 #include <algorithm>
 #include <cctype>
+#include <sys/stat.h>
 
 namespace Librairie {
 

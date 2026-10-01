@@ -1,5 +1,5 @@
 #include "Sidebar.hpp"
-#include "FileUtils.hpp"
+#include "utils/FileUtils.hpp"
 #include <gtk/gtk.h>
 
 namespace Librairie {
