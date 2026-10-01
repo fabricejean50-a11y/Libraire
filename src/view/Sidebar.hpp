@@ -25,8 +25,8 @@ private:
     std::shared_ptr<Folder> rootFolder;
     
     // Tree model columns
-    enum {
-        COLUMN_NAME = 0,
+    enum Column {
+        COLUMN_NAME,
         COLUMN_PATH,
         COLUMN_IS_LEAF,
         NUM_COLUMNS

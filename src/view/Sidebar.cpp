@@ -17,9 +17,10 @@ Sidebar::Sidebar() {
     
     // Create tree view
     treeView = gtk_tree_view_new_with_model(GTK_TREE_MODEL(treeStore));
+    
+    // Set expand properties using widget functions
     gtk_widget_set_hexpand(treeView, TRUE);
     gtk_widget_set_vexpand(treeView, TRUE);
-    gtk_widget_set_size_request(treeView, -1, -1);
     
     // Create column for folder names
     GtkCellRenderer* renderer = gtk_cell_renderer_text_new();
@@ -57,7 +58,7 @@ void Sidebar::loadFileSystem() {
     
     // Add root to tree store
     GtkTreeIter rootIter;
-    gtk_tree_store_append(treeStore, &rootIter, NULL);
+    gtk_tree_store_append(treeStore, &rootIter, nullptr);
     gtk_tree_store_set(treeStore, &rootIter,
                        COLUMN_NAME, rootFolder->getDisplayName().c_str(),
                        COLUMN_PATH, rootFolder->path.c_str(),
@@ -103,7 +104,7 @@ void Sidebar::handleRowActivated(GtkTreeView* view, GtkTreePath* path,
                 gtk_tree_model_get(GTK_TREE_MODEL(treeStore), &iter, COLUMN_PATH, &folderPath, -1);
                 
                 if (folderPath) {
-                    // Find the folder in our model
+                    // Create folder and load contents
                     auto folder = std::make_shared<Folder>(folderPath);
                     folder->loadContents();
                     
