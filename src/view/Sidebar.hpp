@@ -21,19 +21,22 @@ public:
 private:
     GtkWidget* scrolledWindow;
     GtkWidget* listView;
-    GtkTreeListModel* treeListModel;
-    GtkTreeListRow* rootRow;
+    GtkListStore* listStore;
     
     std::shared_ptr<Folder> rootFolder;
     
-    // Store folder data for each row
-    struct RowData {
-        std::string path;
-        std::string name;
-        bool isLeaf;
+    // Custom object type for storing folder data
+    static GType folder_item_get_type(void);
+    
+    struct FolderItem {
+        GObject parent;
+        gchar* name;
+        gchar* path;
+        gboolean is_leaf;
+        guint depth;
     };
     
-    void addFolderToModel(GtkTreeListRow* parentRow, const std::shared_ptr<Folder>& folder);
+    void addFolderToStore(GtkListStore* store, const std::shared_ptr<Folder>& folder, guint depth = 0);
     static void onActivate(GtkListView* view, guint position, gpointer userData);
     void handleActivate(GtkListView* view, guint position);
 };

@@ -4,6 +4,51 @@
 
 namespace Librairie {
 
+// Custom GObject type for folder items
+G_DEFINE_TYPE(Sidebar_FolderItem, Sidebar_FolderItem, G_TYPE_OBJECT)
+
+struct _Sidebar_FolderItem {
+    GObject parent;
+    gchar* name;
+    gchar* path;
+    gboolean is_leaf;
+    guint depth;
+};
+
+struct _Sidebar_FolderItemClass {
+    GObjectClass parent_class;
+};
+
+static void
+Sidebar_FolderItem_finalize(GObject *obj)
+{
+    Sidebar_FolderItem *item = (Sidebar_FolderItem *)obj;
+    g_free(item->name);
+    g_free(item->path);
+    G_OBJECT_CLASS(Sidebar_FolderItem_parent_class)->finalize(obj);
+}
+
+static void
+Sidebar_FolderItem_class_init(Sidebar_FolderItemClass *klass)
+{
+    G_OBJECT_CLASS(klass)->finalize = Sidebar_FolderItem_finalize;
+}
+
+static void
+Sidebar_FolderItem_init(Sidebar_FolderItem *item)
+{
+    item->name = nullptr;
+    item->path = nullptr;
+    item->is_leaf = FALSE;
+    item->depth = 0;
+}
+
+GType
+Sidebar::folder_item_get_type(void)
+{
+    return Sidebar_FolderItem_get_type();
+}
+
 Sidebar::Sidebar() {
     // Create scrolled window
     scrolledWindow = gtk_scrolled_window_new();
@@ -12,12 +57,11 @@ Sidebar::Sidebar() {
     gtk_widget_set_hexpand(scrolledWindow, TRUE);
     gtk_widget_set_vexpand(scrolledWindow, TRUE);
     
-    // Create tree list model with columns: name, path, is_leaf
-    GType columnTypes[3] = {G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN};
-    treeListModel = gtk_tree_list_model_new(columnTypes, 3, nullptr);
+    // Create list store with our custom type
+    listStore = gtk_list_store_new(folder_item_get_type());
     
     // Create list view with the model
-    listView = gtk_list_view_new(GTK_SELECTION_MODEL(gtk_tree_list_model_get_selection(treeListModel)),
+    listView = gtk_list_view_new(GTK_SELECTION_MODEL(gtk_list_store_get_selection(listStore)),
                                   nullptr);
     gtk_widget_set_hexpand(listView, TRUE);
     gtk_widget_set_vexpand(listView, TRUE);
@@ -43,14 +87,13 @@ Sidebar::Sidebar() {
     
     g_signal_connect(factory, "bind", 
                      G_CALLBACK(+[](GtkSignalListItemFactory* self, GtkListItem* list_item, gpointer user_data) {
-                         GtkTreeListRow* row = GTK_TREE_LIST_ROW(gtk_list_item_get_item(list_item));
+                         GObject* item = gtk_list_item_get_item(list_item);
+                         Sidebar_FolderItem* folderItem = (Sidebar_FolderItem*)item;
                          GtkWidget* box = gtk_list_item_get_child(list_item);
                          GtkWidget* label = gtk_widget_get_last_child(box);
                          
-                         // Get the name and path from the row's data
-                         const gchar* name = static_cast<const gchar*>(g_object_get_data(G_OBJECT(row), "folder-name"));
-                         if (name) {
-                             gtk_label_set_text(GTK_LABEL(label), name);
+                         if (folderItem->name) {
+                             gtk_label_set_text(GTK_LABEL(label), folderItem->name);
                          }
                      }), nullptr);
     
@@ -73,7 +116,7 @@ Sidebar::~Sidebar() {
 
 void Sidebar::loadFileSystem() {
     // Clear existing data
-    gtk_tree_list_model_splice(treeListModel, 0, gtk_tree_list_model_get_n_items(treeListModel), nullptr);
+    gtk_list_store_splice(listStore, 0, gtk_list_store_get_n_items(listStore), nullptr);
     
     // Get home directory
     const char* homeDir = g_get_home_dir();
@@ -84,37 +127,27 @@ void Sidebar::loadFileSystem() {
     // Create root folder
     rootFolder = std::make_shared<Folder>(homeDir);
     
-    // Create root row with data
-    GtkTreeListRow* rootRow = gtk_tree_list_row_new();
-    
-    // Store folder data as object data
-    g_object_set_data_full(G_OBJECT(rootRow), "folder-name", 
-                          g_strdup(rootFolder->getDisplayName().c_str()), g_free);
-    g_object_set_data_full(G_OBJECT(rootRow), "folder-path", 
-                          g_strdup(rootFolder->path.c_str()), g_free);
-    g_object_set_data(G_OBJECT(rootRow), "is-leaf", GINT_TO_POINTER(FALSE));
-    
-    gtk_tree_list_model_append(treeListModel, rootRow);
-    
-    // Load root folder contents
-    rootFolder->loadContents();
-    addFolderToModel(rootRow, rootFolder);
+    // Add root folder to store
+    addFolderToStore(listStore, rootFolder, 0);
 }
 
-void Sidebar::addFolderToModel(GtkTreeListRow* parentRow, const std::shared_ptr<Folder>& folder) {
-    // Add subfolders
-    for (const auto& subfolder : folder->subfolders) {
-        GtkTreeListRow* row = gtk_tree_list_row_new();
-        
-        // Store folder data as object data
-        g_object_set_data_full(G_OBJECT(row), "folder-name", 
-                              g_strdup(subfolder->getDisplayName().c_str()), g_free);
-        g_object_set_data_full(G_OBJECT(row), "folder-path", 
-                              g_strdup(subfolder->path.c_str()), g_free);
-        g_object_set_data(G_OBJECT(row), "is-leaf", 
-                         GINT_TO_POINTER(subfolder->subfolders.empty() && subfolder->comics.empty()));
-        
-        gtk_tree_list_row_insert_child(parentRow, -1, row);
+void Sidebar::addFolderToStore(GtkListStore* store, const std::shared_ptr<Folder>& folder, guint depth) {
+    // Create folder item
+    Sidebar_FolderItem* item = (Sidebar_FolderItem*)g_object_new(folder_item_get_type(), nullptr);
+    item->name = g_strdup(folder->getDisplayName().c_str());
+    item->path = g_strdup(folder->path.c_str());
+    item->is_leaf = folder->subfolders.empty() && folder->comics.empty();
+    item->depth = depth;
+    
+    // Add to store
+    gtk_list_store_append(store, G_OBJECT(item));
+    g_object_unref(item);
+    
+    // If this is not a leaf and we're at depth 0 or 1, load subfolders
+    if (!item->is_leaf && depth < 2) {
+        for (const auto& subfolder : folder->subfolders) {
+            addFolderToStore(store, subfolder, depth + 1);
+        }
     }
 }
 
@@ -124,42 +157,21 @@ void Sidebar::onActivate(GtkListView* view, guint position, gpointer userData) {
 }
 
 void Sidebar::handleActivate(GtkListView* view, guint position) {
-    GtkTreeListModel* model = GTK_TREE_LIST_MODEL(gtk_list_view_get_model(view));
-    GtkTreeListRow* row = gtk_tree_list_model_get_row(model, position);
-    if (row == nullptr) return;
+    GObject* itemObj = g_list_model_get_object(G_LIST_MODEL(listStore), position);
+    if (itemObj == nullptr) return;
     
-    // Get the is_leaf value from the row's data
-    gboolean isLeaf = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "is-leaf"));
+    Sidebar_FolderItem* folderItem = (Sidebar_FolderItem*)itemObj;
     
-    if (!isLeaf) {
-        // Check if this row has children already
-        guint nChildren = gtk_tree_list_row_get_n_children(row);
-        if (nChildren == 0) {
-            // Get the path from the row's data
-            const gchar* folderPath = static_cast<const gchar*>(g_object_get_data(G_OBJECT(row), "folder-path"));
-            
-            if (folderPath) {
-                // Create folder and load contents
-                auto folder = std::make_shared<Folder>(folderPath);
-                folder->loadContents();
-                
-                // Add children to model
-                for (const auto& subfolder : folder->subfolders) {
-                    GtkTreeListRow* childRow = gtk_tree_list_row_new();
-                    
-                    // Store folder data as object data
-                    g_object_set_data_full(G_OBJECT(childRow), "folder-name", 
-                                          g_strdup(subfolder->getDisplayName().c_str()), g_free);
-                    g_object_set_data_full(G_OBJECT(childRow), "folder-path", 
-                                          g_strdup(subfolder->path.c_str()), g_free);
-                    g_object_set_data(G_OBJECT(childRow), "is-leaf", 
-                                     GINT_TO_POINTER(subfolder->subfolders.empty() && subfolder->comics.empty()));
-                    
-                    gtk_tree_list_row_insert_child(row, -1, childRow);
-                }
-            }
-        }
+    if (!folderItem->is_leaf) {
+        // Check if we need to load subfolders
+        // For now, just reload the entire filesystem for simplicity
+        loadFileSystem();
     }
+    
+    g_object_unref(itemObj);
 }
 
 } // namespace Librairie
+
+// Define the GType implementation
+G_DEFINE_TYPE(Sidebar_FolderItem, Sidebar_FolderItem, G_TYPE_OBJECT)
